@@ -1,0 +1,16 @@
+# Derleme çıktıları
+build/
+dist/
+*.dmg
+
+# macOS
+.DS_Store
+Icon?
+
+# İmza ve anahtar dosyaları asla depoya girmez
+*.p12
+*.pem
+*.cer
+*.key
+*.mobileprovision
+.env*
