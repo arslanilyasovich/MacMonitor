@@ -7,7 +7,7 @@
 <p align="center">
   Menü çubuğunda yaşayan, hafif ve güvenli bir Mac bakım uygulaması.<br>
   <i>A lightweight, privacy-first Mac care app that lives in your menu bar.</i><br><br>
-  <b>prod. by Arslan</b>
+  <b>by Arslan</b>
 </p>
 
 <p align="center">
@@ -94,4 +94,4 @@ MacMonitor is a menu-bar Mac care app: live CPU / memory / disk / network stats,
 
 © 2026 Arslan. **Tüm hakları saklıdır.** Kaynak kod incelenmek için görünürdür; izin alınmadan kopyalanamaz, değiştirilip dağıtılamaz, satılamaz veya başka bir isimle yayınlanamaz. Ayrıntılar: [LICENSE](LICENSE).
 
-<p align="center"><sub>prod. by <b>Arslan</b></sub></p>
+<p align="center"><sub>Made by <b>Arslan</b></sub></p>

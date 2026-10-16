@@ -37,7 +37,7 @@ text("MacMonitor", 26, .bold, .white, y: 336)
 
 // sağ altta imza
 let sigAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .regular), .foregroundColor: rgb(255, 255, 255, 0.5)]
-let sig = NSMutableAttributedString(string: "prod. by ", attributes: sigAttrs)
+let sig = NSMutableAttributedString(string: "by ", attributes: sigAttrs)
 sig.append(NSAttributedString(string: "Arslan", attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: rgb(69, 163, 255)]))
 sig.draw(at: NSPoint(x: 640 - sig.size().width - 16, y: 10))
 text("Kurmak için simgeyi Uygulamalar klasörüne sürükle  ·  Drag the icon to Applications", 12, .regular, rgb(255, 255, 255, 0.6), y: 308)

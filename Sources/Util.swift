@@ -243,12 +243,13 @@ struct BigRoundButton: View {
     }
 }
 
-/// "prod. by Arslan" imzası
+/// "by Arslan" imzası (Hakkında/Ayarlar'da "Made by Arslan")
 struct Signature: View {
     var size: CGFloat = 11
+    var prefix = "by"
 
     var body: some View {
-        (Text("prod. by ").foregroundColor(Theme.secondary) + Text("Arslan").foregroundColor(Theme.accent).fontWeight(.semibold))
+        (Text(prefix + " ").foregroundColor(Theme.secondary) + Text("Arslan").foregroundColor(Theme.accent).fontWeight(.semibold))
             .font(.system(size: size, design: .rounded))
     }
 }

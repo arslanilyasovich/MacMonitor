@@ -285,7 +285,7 @@ struct MenuPanel: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("MacMonitor 2.3").font(.system(size: 12)).foregroundStyle(Theme.secondary)
-                    Signature()
+                    Signature(prefix: "Made by")
                 }
                 Spacer()
                 Button(t("MacMonitor'den Çık", "Quit MacMonitor")) { NSApp.terminate(nil) }
