@@ -12,6 +12,7 @@ struct MainView: View {
     @ObservedObject var lens: SpaceLensModel
     @ObservedObject var timeMachine: TimeMachineModel
     @ObservedObject var leftovers: LeftoversModel
+    @ObservedObject var projects: ProjectsModel
     @ObservedObject var lang = Lang.shared
 
     var body: some View {
@@ -26,8 +27,8 @@ struct MainView: View {
                 case .performance: PerformanceView(sys: sys, ui: ui)
                 case .apps: AppsView(apps: apps)
                 case .spaceLens: SpaceLensView(lens: lens)
-                case .tools: ToolsView(tm: timeMachine, leftovers: leftovers, ui: ui, clutter: clutter)
-                case .activity: ActivityView(sys: sys, sec: sec, cleaner: cleaner, clutter: clutter, ui: ui)
+                case .tools: ToolsView(tm: timeMachine, leftovers: leftovers, ui: ui, clutter: clutter, projects: projects)
+                case .activity: ActivityView(sys: sys, sec: sec, cleaner: cleaner, clutter: clutter, ui: ui, projects: projects)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,6 +37,7 @@ struct MainView: View {
         .background(ThemeBackground().ignoresSafeArea())
         .preferredColorScheme(.dark)
         .id(lang.code) // dil değişince tüm metinler yeniden çizilsin
+        .onAppear { sys.viewAppeared() }
         .onDisappear { NSApp.setActivationPolicy(.accessory) }
     }
 }

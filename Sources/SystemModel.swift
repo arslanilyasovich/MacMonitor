@@ -3,6 +3,7 @@ import AppKit
 import Darwin
 import IOKit
 import IOKit.ps
+import UserNotifications
 
 struct ProcRow: Identifiable {
     let id: String
@@ -114,6 +115,14 @@ final class SystemModel: ObservableObject {
     @Published var launchAtLogin = FileManager.default.fileExists(atPath: SystemModel.agentURL.path) {
         didSet { setLoginAgent(launchAtLogin) }
     }
+    @Published var diskAlerts = UserDefaults.standard.object(forKey: "diskAlerts") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(diskAlerts, forKey: "diskAlerts") }
+    }
+    @Published var diskForecastDays: Int?    // bu hızla disk kaç gün sonra dolar (nil: yeterli veri yok ya da dolmuyor)
+    @Published var diskTrendPerDay: Double?  // günlük ortalama değişim (bayt)
+
+    /// Panel ya da pencere açıkken ayrıntılı ölçüm yapılır; kapalıyken sadece menü çubuğundaki CPU/RAM güncellenir.
+    private var detailed = false
 
     private var prevTicks: (UInt64, UInt64, UInt64)?
     private var prevProcCPU: [pid_t: UInt64] = [:]
@@ -144,18 +153,106 @@ final class SystemModel: ObservableObject {
         refresh()
         readMachine()
         readSlow()
+        readDisk()
+        updateDiskHistory()
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
-        slowTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.readSlow() }
+        slowTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.readSlow()
+            self?.readDisk()
+            self?.updateDiskHistory()
+        }
     }
 
     func refresh() {
         readCPU()
         readMemory()
-        readNetwork()
-        if tick % 2 == 0 { readTopProcesses() }
-        if tick % 5 == 0 { readDisk(); readUptime() }
+        // SwiftUI menü paneli kapanınca haber vermiyor: görünür bir penceremiz var mı diye doğrudan bak
+        let visible = NSApp.windows.contains {
+            $0.isVisible && $0.occlusionState.contains(.visible) && !String(describing: type(of: $0)).contains("StatusBar")
+        }
+        if visible && !detailed { wakeDetails() }
+        detailed = visible
+        if visible {
+            readNetwork()
+            if tick % 2 == 0 { readTopProcesses() }
+            if tick % 5 == 0 { readDisk(); readUptime() }
+        }
         if tick % 15 == 0 { readBattery() }
         tick += 1
+    }
+
+    /// Panel açılır açılmaz verileri tazele (bir sonraki 2 sn'lik turu beklemeden).
+    func viewAppeared() {
+        guard !detailed else { return }
+        detailed = true
+        wakeDetails()
+    }
+
+    private func wakeDetails() {
+        // Kapalıyken ölçülmeyenleri hemen tazele; eski örneklerle uzun aralığın ortalaması gösterilmesin
+        prevNet = nil
+        prevProcCPU = [:]
+        prevProcTime = 0
+        readNetwork()
+        readTopProcesses()
+        readDisk()
+        readUptime()
+    }
+
+    // MARK: Disk tahmini ve uyarılar
+
+    /// Her gün için bir doluluk değeri saklar (90 gün) ve doğrusal eğilimden dolma süresini hesaplar.
+    private func updateDiskHistory() {
+        guard diskTotal > 0 else { return }
+        let used = Double(diskTotal - diskFree)
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        var hist = UserDefaults.standard.dictionary(forKey: "diskHistory") as? [String: Double] ?? [:]
+        hist[f.string(from: Date())] = used
+        let keys = hist.keys.sorted()
+        if keys.count > 90 { keys.prefix(keys.count - 90).forEach { hist.removeValue(forKey: $0) } }
+        UserDefaults.standard.set(hist, forKey: "diskHistory")
+
+        let pts = hist.compactMap { k, v in f.date(from: k).map { ($0.timeIntervalSince1970 / 86_400, v) } }
+        if let first = pts.map(\.0).min(), let last = pts.map(\.0).max(), pts.count >= 7, last - first >= 6 {
+            let n = Double(pts.count)
+            let mx = pts.reduce(0) { $0 + $1.0 } / n, my = pts.reduce(0) { $0 + $1.1 } / n
+            let sxx = pts.reduce(0) { $0 + ($1.0 - mx) * ($1.0 - mx) }
+            let slope = sxx > 0 ? pts.reduce(0) { $0 + ($1.0 - mx) * ($1.1 - my) } / sxx : 0
+            diskTrendPerDay = slope
+            // Günde 50 MB'tan az artış: pratikte sabit
+            diskForecastDays = slope > 50_000_000 ? Int(Double(diskFree) / slope) : nil
+        } else {
+            diskTrendPerDay = nil
+            diskForecastDays = nil
+        }
+        checkDiskAlert()
+    }
+
+    /// %80 ve %90 eşiklerinde bir kez bildirir; eşiğin altına inince yeniden kurulur.
+    private func checkDiskAlert() {
+        guard diskAlerts, diskTotal > 0 else { return }
+        let pct = Double(diskTotal - diskFree) / Double(diskTotal) * 100
+        let d = UserDefaults.standard
+        var level = d.integer(forKey: "diskAlertLevel")
+        if pct < 78 { level = 0 } else if pct < 88 && level == 90 { level = 80 }
+        let target = pct >= 90 ? 90 : pct >= 80 ? 80 : 0
+        if target > level {
+            level = target
+            let title = t("Disk %\(Int(pct)) dolu", "Disk is \(Int(pct))% full")
+            let body = t("\(fmtBytes(diskFree)) boş yer kaldı. MacMonitor'de Sistem Çöpü ve Proje Artıkları'na göz at.",
+                         "\(fmtBytes(diskFree)) left. Check System Junk and Project Leftovers in MacMonitor.")
+            let center = UNUserNotificationCenter.current()
+            center.requestAuthorization(options: [.alert, .sound]) { ok, _ in
+                guard ok else { return }
+                let c = UNMutableNotificationContent()
+                c.title = title
+                c.body = body
+                center.add(UNNotificationRequest(identifier: "disk-\(target)", content: c, trigger: nil))
+            }
+        }
+        d.set(level, forKey: "diskAlertLevel")
     }
 
     // MARK: Eylemler

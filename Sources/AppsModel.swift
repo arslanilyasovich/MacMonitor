@@ -92,9 +92,10 @@ final class AppsModel: ObservableObject {
             var moved = 0, failed = 0
             if ok {
                 for l in leftovers {
+                    if Safety.refusal(l.url, gitCheck: true) != nil { failed += 1; continue }
                     do { try FileManager.default.trashItem(at: l.url, resultingItemURL: nil); moved += 1 } catch { failed += 1 }
                 }
-                ActivityStore.shared.record(total)
+                ActivityStore.shared.recordTrash(total)
                 self.apps.removeAll { $0.path == app.path }
                 self.selectedPath = nil
                 self.leftovers = []

@@ -28,16 +28,17 @@
 | Bölüm | Ne yapar |
 |---|---|
 | Akıllı Bakım | Tek taramada temizlik, koruma, performans, uygulamalar ve dağınıklık özeti |
-| Sistem Çöpü | Uygulama ve tarayıcı önbellekleri, günlükler, geliştirici önbellekleri, kurulum dosyaları, Mail ekleri, Çöp Kutusu |
+| Sistem Çöpü | Uygulama ve tarayıcı önbellekleri, günlükler, 50+ geliştirici önbelleği (npm, pnpm, pip, uv, Cargo, Gradle, Xcode, VS Code…) risk etiketi ve açıklamasıyla, kurulum dosyaları, Mail ekleri, Çöp Kutusu. Öğeler tek tek seçilebilir |
 | Dağınıklık | 100 MB üstü ve 6 aydır açılmamış dosyalar, birebir aynı (kopya) dosyalar |
 | Alan Haritası | Klasörleri boyuta göre gösterir, içine girerek gezinilir |
 | Koruma | SIP, Gatekeeper, FileVault, Güvenlik Duvarı, XProtect; başlangıç öğeleri ve uygulamaların imza kontrolü (kırık/imzasız yazılımları yakalar) |
 | Performans | Bellek ayrıntısı, RAM boşaltma, DNS önbelleği, Spotlight onarımı |
 | Uygulama Kaldırıcı | Uygulamayı Kitaplık'taki artıklarıyla birlikte kaldırır |
-| Araçlarım | Uygulama artıkları, Time Machine yerel anlık görüntüleri, uygulama izinleri |
-| Etkinliğim | Toplam açılan yer ve öneriler |
+| Araçlarım | **Proje artıkları** (eski projelerdeki node_modules, venv, Rust target, .next…), uygulama artıkları, Time Machine yerel anlık görüntüleri, uygulama izinleri |
+| Etkinliğim | Kalıcı açılan yer ve Çöp Kutusu'na taşınan ayrı ayrı, disk dolma tahmini, öneriler |
 
-Türkçe ve İngilizce arayüz, açılışta otomatik başlatma.
+Disk %80 ve %90 dolduğunda bildirim, son 90 günün doluluğuna göre "disk ~N gün sonra dolar" tahmini.
+Türkçe ve İngilizce arayüz, açılışta otomatik başlatma. Panel kapalıyken sadece menü çubuğundaki değerleri ölçer (~%0,5 işlemci).
 
 ## Güvenlik ve gizlilik
 
@@ -47,6 +48,8 @@ MacMonitor bir temizlik uygulamasından beklenmesi gereken en temkinli şekilde 
 - **Root servisi kurmaz.** Arka planda tam yetkiyle çalışan hiçbir şey yoktur. Yönetici şifresi sadece bakım görevlerinde, macOS'un kendi penceresiyle istenir.
 - **Giriş bilgilerine dokunmaz.** Anahtar Zinciri, `Application Support`, `~/.ssh`, terminal geçmişi, `~/.claude` gibi alanlar temizlik kapsamında değildir.
 - **Kullanıcı dosyaları silinmez, Çöp Kutusu'na taşınır.** Büyük dosyalar, kopyalar, kurulum dosyaları, uygulama artıkları geri alınabilir.
+- **Her silmeden önce güvenlik kontrolü:** kısayollar (symlink), ana klasörler, `.ssh`, `.claude`, anahtar zinciri, Mail, Mesajlar, iCloud, fotoğraf arşivi, `.env` dosyaları ve `.git` reddedilir. Git deposundaki bir klasör ancak `.gitignore`'daysa temizlenir; kaynak koduna dokunulmaz.
+- **Proje artıklarında:** çalışan bir programı olan projeler (bot, sunucu) atlanır; varsayılan olarak sadece 30 günden uzun süredir dokunulmamışlar seçilir, Python ortamları seçilmez.
 - **Ek korumalar:** açık uygulamaların önbelleği atlanır; Apple'ın sistem önbellekleri, Spotify çevrimdışı müzikleri gibi kullanıcı verisi içeren önbellekler korunur; içinde `auth`, `token`, `session`, `login` gibi dosyalar olan klasörler asla "artık" olarak gösterilmez.
 - **Gerçek zamanlı antivirüs değildir.** Koruma bölümü ayarları ve imzaları denetler; virüs imzası taraması için Apple'ın XProtect'i ya da Malwarebytes gibi bir araç kullan.
 
@@ -82,7 +85,7 @@ build.sh      derleme + kurulum
 
 ## English
 
-MacMonitor is a menu-bar Mac care app: live CPU / memory / disk / network stats, junk cleanup, large and duplicate file finder, Space Lens, uninstaller with leftovers, security check (catches cracked/unsigned software), maintenance tasks and Time Machine snapshot cleanup. Turkish and English UI.
+MacMonitor is a menu-bar Mac care app: live CPU / memory / disk / network stats, junk cleanup with 50+ developer caches, project leftovers (node_modules, venv, target), disk-full forecast and alerts, large and duplicate file finder, Space Lens, uninstaller with leftovers, security check (catches cracked/unsigned software), maintenance tasks and Time Machine snapshot cleanup. Turkish and English UI.
 
 **Privacy:** no telemetry, no accounts, no root helper. It never touches your Keychain, `Application Support`, SSH keys or shell history. User files are moved to the Trash, never deleted outright.
 

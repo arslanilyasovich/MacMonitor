@@ -86,9 +86,13 @@ final class SpaceLensModel: ObservableObject {
             return
         }
         pendingTrash = nil
+        if let why = Safety.refusal(item.url) {
+            message = t("Taşınmadı: \(item.url.lastPathComponent) — \(why)", "Not moved: \(item.url.lastPathComponent) — \(why)")
+            return
+        }
         do {
             try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
-            ActivityStore.shared.record(item.size)
+            ActivityStore.shared.recordTrash(item.size)
             items.removeAll { $0.id == item.id }
             cache.removeAll() // üst klasörlerin boyutları değişti
             cache[current.path] = items
@@ -191,13 +195,14 @@ final class LeftoversModel: ObservableObject {
     func trashSelected() {
         var moved = 0, failed = 0, freed: Int64 = 0
         for item in items where selected.contains(item.id) {
+            if Safety.refusal(item.url, gitCheck: true) != nil { failed += 1; continue }
             do {
                 try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
                 moved += 1
                 freed += item.size
             } catch { failed += 1 }
         }
-        ActivityStore.shared.record(freed)
+        ActivityStore.shared.recordTrash(freed)
         items.removeAll { selected.contains($0.id) && !FileManager.default.fileExists(atPath: $0.url.path) }
         selected = []
         var msg = t("✓ \(moved) öğe Çöp Kutusu'na taşındı (\(fmtBytes(freed)))", "✓ \(moved) items moved to Trash (\(fmtBytes(freed)))")
@@ -278,10 +283,12 @@ final class ActivityStore: ObservableObject {
     @Published private(set) var freedTotal: Int64
     @Published private(set) var cleanCount: Int
     @Published private(set) var lastClean: Date?
+    @Published private(set) var trashedTotal: Int64   // Çöp Kutusu'na taşınan: boşaltılana kadar yer açmaz
 
     private init() {
         let d = UserDefaults.standard
         freedTotal = Int64(d.integer(forKey: "freedTotal"))
+        trashedTotal = Int64(d.integer(forKey: "trashedTotal"))
         cleanCount = d.integer(forKey: "cleanCount")
         lastClean = d.object(forKey: "lastClean") as? Date
     }
@@ -293,6 +300,17 @@ final class ActivityStore: ObservableObject {
         lastClean = Date()
         let d = UserDefaults.standard
         d.set(Int(freedTotal), forKey: "freedTotal")
+        d.set(cleanCount, forKey: "cleanCount")
+        d.set(lastClean, forKey: "lastClean")
+    }
+
+    func recordTrash(_ bytes: Int64) {
+        guard bytes > 0 else { return }
+        trashedTotal += bytes
+        cleanCount += 1
+        lastClean = Date()
+        let d = UserDefaults.standard
+        d.set(Int(trashedTotal), forKey: "trashedTotal")
         d.set(cleanCount, forKey: "cleanCount")
         d.set(lastClean, forKey: "lastClean")
     }
@@ -311,7 +329,7 @@ struct Recommendation: Identifiable {
     let panel: PanelPage?
 }
 
-func recommendations(sys: SystemModel, sec: SecurityModel, cleaner: CleanerModel, clutter: ClutterModel) -> [Recommendation] {
+func recommendations(sys: SystemModel, sec: SecurityModel, cleaner: CleanerModel, clutter: ClutterModel, projects: ProjectsModel? = nil) -> [Recommendation] {
     var r: [Recommendation] = []
     if sys.pressureLevel >= 2 {
         r.append(Recommendation(id: "memory", icon: "memorychip.fill", color: Theme.warn,
@@ -342,6 +360,20 @@ func recommendations(sys: SystemModel, sec: SecurityModel, cleaner: CleanerModel
                                 title: t("\(fmtBytes(cleaner.total)) gereksiz dosya", "\(fmtBytes(cleaner.total)) of junk"),
                                 text: t("Önbellek ve günlükleri temizleyerek yer aç.", "Free up space by cleaning caches and logs."),
                                 action: t("Temizle", "Clean Up"), section: .cleanup, panel: nil))
+    }
+    if let p = projects, p.staleSize > 500_000_000 {
+        r.append(Recommendation(id: "projects", icon: "hammer.circle.fill", color: Theme.good,
+                                title: t("Eski projelerde \(fmtBytes(p.staleSize))", "\(fmtBytes(p.staleSize)) in old projects"),
+                                text: t("\(ProjectsModel.minAgeDays) günden uzun süredir dokunulmamış projelerdeki node_modules, target gibi klasörler.",
+                                        "node_modules, target and similar folders in projects untouched for \(ProjectsModel.minAgeDays)+ days."),
+                                action: t("İncele", "Review"), section: .tools, panel: nil))
+    }
+    if let d = sys.diskForecastDays, d < 60 {
+        r.append(Recommendation(id: "forecast", icon: "chart.line.uptrend.xyaxis", color: d < 30 ? Theme.bad : Theme.warn,
+                                title: t("Disk ~\(d) gün içinde dolacak", "Disk full in ~\(d) days"),
+                                text: t("Son günlerdeki doluluk hızına göre tahmin. Neyin büyüdüğünü Alan Haritası'nda gör.",
+                                        "Based on recent growth. See what's growing in Space Lens."),
+                                action: t("Alan Haritası", "Space Lens"), section: .spaceLens, panel: nil))
     }
     if clutter.dupWaste > 100_000_000 {
         r.append(Recommendation(id: "dups", icon: "doc.on.doc.fill", color: Theme.accent,

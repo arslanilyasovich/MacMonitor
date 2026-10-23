@@ -50,16 +50,31 @@ struct CleanupView: View {
                                 }
                                 if c.expanded.contains(cat.id) {
                                     VStack(spacing: 5) {
-                                        ForEach(cat.items.prefix(30)) { item in
-                                            HStack {
-                                                Text(item.url.lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                                        ForEach(cat.items.prefix(cat.id == "dev" ? 100 : 30)) { item in
+                                            let on = Binding<Bool>(
+                                                get: { !cat.excluded.contains(item.id) },
+                                                set: { v in if v { $cat.wrappedValue.excluded.remove(item.id) } else { $cat.wrappedValue.excluded.insert(item.id) } })
+                                            HStack(alignment: .top, spacing: 8) {
+                                                Toggle("", isOn: on).toggleStyle(.checkbox).labelsHidden().controlSize(.small)
+                                                VStack(alignment: .leading, spacing: 1) {
+                                                    HStack(spacing: 6) {
+                                                        Text(item.dev?.name ?? item.url.lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                                                        if item.dev?.caution == true { RiskTag(text: t("dikkat", "caution"), color: Theme.warn) }
+                                                    }
+                                                    if let d = item.dev {
+                                                        Text(d.note).font(.system(size: 11)).foregroundStyle(Theme.secondary).lineLimit(2)
+                                                    }
+                                                }
                                                 Spacer()
                                                 Text(fmtBytes(item.size)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.secondary)
+                                                Button { revealInFinder(item.url) } label: { Image(systemName: "magnifyingglass").font(.system(size: 11)) }
+                                                    .buttonStyle(.plain).foregroundStyle(Theme.secondary).help(t("Finder'da göster", "Show in Finder"))
                                             }
+                                            .opacity(cat.excluded.contains(item.id) ? 0.55 : 1)
                                         }
                                         ForEach(cat.inUse) { item in
                                             HStack {
-                                                Text(item.url.lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                                                Text(item.dev?.name ?? item.url.lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
                                                 Text(t("kullanımda", "in use")).font(.system(size: 10, weight: .semibold))
                                                     .padding(.horizontal, 6).padding(.vertical, 1)
                                                     .background(Capsule().fill(Theme.warn.opacity(0.18))).foregroundStyle(Theme.warn)
@@ -67,7 +82,7 @@ struct CleanupView: View {
                                                 Text(fmtBytes(item.size)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.secondary)
                                             }
                                         }
-                                        if cat.items.count > 30 {
+                                        if cat.id != "dev" && cat.items.count > 30 {
                                             Text(t("+\(cat.items.count - 30) öğe daha", "+\(cat.items.count - 30) more items"))
                                                 .font(.system(size: 11)).foregroundStyle(Theme.secondary)
                                         }
@@ -91,6 +106,18 @@ struct CleanupView: View {
             .background(Color.black.opacity(0.25))
         }
         .onAppear { if c.cats.isEmpty { c.scan() } }
+    }
+}
+
+/// Küçük renkli etiket: "dikkat", "kullanımda", "çalışıyor"…
+struct RiskTag: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text).font(.system(size: 10, weight: .semibold))
+            .padding(.horizontal, 6).padding(.vertical, 1)
+            .background(Capsule().fill(color.opacity(0.18))).foregroundStyle(color)
     }
 }
 

@@ -11,6 +11,7 @@ struct MacMonitorApp: App {
     @StateObject private var lens = SpaceLensModel()
     @StateObject private var timeMachine = TimeMachineModel()
     @StateObject private var leftovers = LeftoversModel()
+    @StateObject private var projects = ProjectsModel()
 
     var body: some Scene {
         MenuBarExtra {
@@ -24,7 +25,7 @@ struct MacMonitorApp: App {
 
         Window("MacMonitor", id: "main") {
             MainView(sys: sys, cleaner: cleaner, sec: sec, apps: apps, clutter: clutter, ui: ui,
-                     lens: lens, timeMachine: timeMachine, leftovers: leftovers)
+                     lens: lens, timeMachine: timeMachine, leftovers: leftovers, projects: projects)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1040, height: 700)

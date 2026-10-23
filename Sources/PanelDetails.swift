@@ -78,6 +78,21 @@ struct DiskPanelPage: View {
     let back: () -> Void
     let openCleanup: () -> Void
 
+    private var diskTrendValue: String {
+        if let d = sys.diskForecastDays { return t("~\(d) gün", "~\(d) days") }
+        return sys.diskTrendPerDay == nil ? "…" : t("Sabit", "Stable")
+    }
+
+    private var diskTrendText: String {
+        guard let slope = sys.diskTrendPerDay else {
+            return t("Tahmin için en az 7 günlük veri gerekiyor. MacMonitor her gün kaydediyor.", "Needs at least 7 days of data. MacMonitor records it daily.")
+        }
+        if sys.diskForecastDays != nil {
+            return t("Günde ~\(fmtBytes(Int64(slope))) doluyor. Bu hızla disk bu kadar sürede dolar.", "Filling ~\(fmtBytes(Int64(slope))) a day. At this rate the disk is full in this time.")
+        }
+        return t("Son günlerde doluluk belirgin şekilde artmıyor.", "Usage hasn't been growing noticeably.")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             BackHeader(title: sys.diskName, back: back)
@@ -114,6 +129,12 @@ struct DiskPanelPage: View {
                          valueColor: smartOK ? Theme.good : Theme.bad,
                          text: smartOK ? t("SMART durumu doğrulandı. Disk sorunsuz çalışıyor.", "SMART status verified. The drive is working fine.")
                                        : t("SMART bir sorun bildiriyor. Yedeğini al.", "SMART reports a problem. Back up your data."))
+                InfoTile(title: t("Doluluk eğilimi", "Usage trend"),
+                         value: diskTrendValue, valueColor: sys.diskForecastDays.map { $0 < 30 ? Theme.bad : Theme.warn } ?? Theme.good,
+                         text: diskTrendText)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
                 InfoTile(title: t("Çöp Kutusu", "Trash"),
                          value: sys.trashSize.map { fmtBytes($0) } ?? "?",
                          text: t("Silinen dosyalar burada yer kaplamaya devam eder.", "Deleted files keep using space here."),

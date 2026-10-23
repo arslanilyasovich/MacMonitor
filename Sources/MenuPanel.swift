@@ -34,6 +34,7 @@ struct MenuPanel: View {
         .background(ThemeBackground())
         .environment(\.colorScheme, .dark)
         .id(lang.code) // dil değişince tüm metinler yeniden çizilsin
+        .onAppear { sys.viewAppeared() }
     }
 
     private func openMain(_ section: AppSection) {
@@ -274,6 +275,15 @@ struct MenuPanel: View {
                 }.toggleStyle(.switch)
             }.fixedSize(horizontal: false, vertical: true)
             Card {
+                Toggle(isOn: $sys.diskAlerts) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(t("Disk doluluk bildirimleri", "Disk space alerts")).font(.system(size: 14, weight: .medium))
+                        Text(t("Disk %80 ve %90 dolduğunda bir kez haber verir", "Notifies once when the disk reaches 80% and 90%"))
+                            .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    }
+                }.toggleStyle(.switch)
+            }.fixedSize(horizontal: false, vertical: true)
+            Card {
                 HStack {
                     Text(t("Etkinlik Monitörü", "Activity Monitor")).font(.system(size: 14, weight: .medium))
                     Spacer()
@@ -284,7 +294,7 @@ struct MenuPanel: View {
             }.fixedSize(horizontal: false, vertical: true)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("MacMonitor 2.3").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    Text("MacMonitor 2.4").font(.system(size: 12)).foregroundStyle(Theme.secondary)
                     Signature(prefix: "Made by")
                 }
                 Spacer()

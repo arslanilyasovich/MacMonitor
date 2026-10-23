@@ -104,6 +104,7 @@ struct ToolsView: View {
     @ObservedObject var leftovers: LeftoversModel
     @ObservedObject var ui: UIModel
     @ObservedObject var clutter: ClutterModel
+    @ObservedObject var projects: ProjectsModel
 
     var body: some View {
         ScrollView {
@@ -111,6 +112,11 @@ struct ToolsView: View {
                 PageHeader(title: t("Araçlarım", "My Tools"),
                            subtitle: t("Mac'ini temiz, güvenli ve hızlı tutmak için araçlar.", "Your go-to tools for keeping your Mac clean, safe and running smoothly."))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), spacing: 14) {
+                    tool("hammer.circle.fill", Theme.good, t("Proje Artıkları", "Project Leftovers"),
+                         t("Projelerdeki node_modules, venv, target gibi yeniden oluşturulabilen klasörler.", "Rebuildable folders in your projects: node_modules, venv, target and more."), t("Tara", "Scan")) {
+                        ui.toolPage = "projects"
+                        if !projects.scannedOnce { projects.scan() }
+                    }
                     tool("wrench.and.screwdriver.fill", Theme.warn, t("Bakım Görevleri", "Maintenance Tasks"),
                          t("RAM boşalt, DNS ve Spotlight onarımı.", "Free RAM, flush DNS, repair Spotlight."), t("Aç", "Open")) {
                         ui.section = .performance
@@ -142,6 +148,7 @@ struct ToolsView: View {
                 }
 
                 switch ui.toolPage {
+                case "projects": projectsSection
                 case "leftovers": leftoversSection
                 case "timemachine": timeMachineSection
                 case "permissions": permissionsSection
@@ -207,6 +214,63 @@ struct ToolsView: View {
                             Button { revealInFinder(item.url) } label: { Image(systemName: "magnifyingglass") }.buttonStyle(.plain)
                         }
                         .padding(.vertical, 5).padding(.horizontal, 6)
+                    }
+                }
+            }
+        }
+    }
+
+    private var projectsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(t("Proje Artıkları", "Project Leftovers")).font(.system(size: 17, weight: .semibold))
+                if projects.scanning { ProgressView().controlSize(.small) }
+                Spacer()
+                if !projects.items.isEmpty {
+                    SecondaryButton(title: t("\(ProjectsModel.minAgeDays)+ gün eskileri seç", "Select \(ProjectsModel.minAgeDays)+ days old")) {
+                        projects.selected = Set(projects.items.filter { $0.usable && $0.ageDays >= ProjectsModel.minAgeDays }.map(\.id))
+                    }
+                }
+                SecondaryButton(title: t("Yeniden tara", "Rescan"), disabled: projects.scanning) { projects.scan() }
+                PrimaryButton(title: t("Çöpe taşı · ", "Move to Trash · ") + fmtBytes(projects.selectedSize),
+                              disabled: projects.selected.isEmpty || projects.scanning) { projects.trashSelected() }
+            }
+            Text(t("Masaüstü, Belgeler ve ev klasöründeki projeler taranır. Çalışan bir programı olan projeler ve git'te takip edilen dosyalar atlanır. Varsayılan olarak sadece \(ProjectsModel.minAgeDays) günden uzun süredir dokunulmamış olanlar seçilir; Python ortamları (venv) yeniden kurulum istediği için seçilmez.",
+                   "Projects in Desktop, Documents and your home folder are scanned. Projects with a running program and files tracked by git are skipped. Only folders untouched for \(ProjectsModel.minAgeDays)+ days are selected by default; Python environments (venv) need reinstalling, so they aren't."))
+                .font(.system(size: 12)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+            if let m = projects.message { Text(m).font(.system(size: 12)).foregroundStyle(Theme.good) }
+            Card(padding: 8) {
+                VStack(spacing: 0) {
+                    if projects.items.isEmpty {
+                        Text(projects.scanning ? t("Projeler taranıyor…", "Scanning projects…") : t("Proje artığı bulunamadı.", "No project leftovers found."))
+                            .foregroundStyle(Theme.secondary).padding(8)
+                    }
+                    ForEach(projects.items) { a in
+                        let binding = Binding<Bool>(
+                            get: { projects.selected.contains(a.id) },
+                            set: { on in if on { projects.selected.insert(a.id) } else { projects.selected.remove(a.id) } })
+                        HStack(spacing: 10) {
+                            Toggle("", isOn: binding).toggleStyle(.checkbox).labelsHidden().disabled(!a.usable)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(a.project.lastPathComponent).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                                    Text(a.name).font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.accent)
+                                    Text(a.type).font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                                    if a.running { RiskTag(text: t("çalışıyor", "running"), color: Theme.warn) }
+                                    if let why = a.blocked { RiskTag(text: why, color: Theme.bad) }
+                                    if a.reinstall && a.usable { RiskTag(text: t("yeniden kurulum", "reinstall"), color: Theme.warn) }
+                                }
+                                Text(a.note + " · " + t("son değişiklik \(a.ageDays) gün önce", "last changed \(a.ageDays) days ago"))
+                                    .font(.system(size: 11)).foregroundStyle(Theme.secondary).lineLimit(1)
+                                Text(a.url.deletingLastPathComponent().path.replacingOccurrences(of: home.path, with: "~"))
+                                    .font(.system(size: 10)).foregroundStyle(Theme.secondary.opacity(0.8)).lineLimit(1).truncationMode(.middle)
+                            }
+                            Spacer()
+                            Text(fmtBytes(a.size)).font(.system(size: 12, weight: .semibold).monospacedDigit())
+                            Button { revealInFinder(a.url) } label: { Image(systemName: "magnifyingglass") }.buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 6).padding(.horizontal, 6)
+                        .opacity(a.usable ? 1 : 0.55)
                     }
                 }
             }
@@ -281,6 +345,7 @@ struct ActivityView: View {
     @ObservedObject var cleaner: CleanerModel
     @ObservedObject var clutter: ClutterModel
     @ObservedObject var ui: UIModel
+    @ObservedObject var projects: ProjectsModel
     @ObservedObject var store = ActivityStore.shared
 
     var body: some View {
@@ -307,10 +372,15 @@ struct ActivityView: View {
                             }
                             ProgressView(value: sys.diskTotal > 0 ? Double(sys.diskTotal - sys.diskFree) / Double(sys.diskTotal) : 0)
                                 .tint(Theme.accent)
+                            if let d = sys.diskForecastDays {
+                                Label(t("Bu hızla disk ~\(d) gün sonra dolacak", "At this rate the disk is full in ~\(d) days"), systemImage: "chart.line.uptrend.xyaxis")
+                                    .font(.system(size: 12)).foregroundStyle(d < 30 ? Theme.bad : Theme.warn)
+                            }
                         }
                     }
                     VStack(spacing: 14) {
-                        stat("arrow.down.circle.fill", Theme.good, fmtBytes(store.freedTotal), t("toplam yer açıldı", "freed in total"))
+                        stat("arrow.down.circle.fill", Theme.good, fmtBytes(store.freedTotal), t("kalıcı olarak silindi", "permanently freed"))
+                        stat("trash.fill", Theme.warn, fmtBytes(store.trashedTotal), t("Çöp Kutusu'na taşındı", "moved to Trash"))
                         stat("sparkles", Theme.accent, "\(store.cleanCount)", t("temizlik yapıldı", "cleanups done"))
                         stat("clock.fill", Theme.accent2, ago(store.lastClean), t("son temizlik", "last cleanup"))
                     }
@@ -318,11 +388,15 @@ struct ActivityView: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
 
-                let recs = recommendations(sys: sys, sec: sec, cleaner: cleaner, clutter: clutter)
+                let recs = recommendations(sys: sys, sec: sec, cleaner: cleaner, clutter: clutter, projects: projects)
                 Text(t("\(recs.count) Öneri", "\(recs.count) Recommendations")).font(.system(size: 16, weight: .semibold))
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                     ForEach(recs) { rec in
                         RecommendationCard(rec: rec) { r in
+                            if r.id == "projects" {
+                                ui.toolPage = "projects"
+                                if !projects.scannedOnce { projects.scan() }
+                            }
                             if let s = r.section { ui.section = s }
                         }
                     }

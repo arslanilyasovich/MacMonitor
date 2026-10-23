@@ -82,9 +82,13 @@ final class ClutterModel: ObservableObject {
     }
 
     func trash(_ f: FileEntry) {
+        if let why = Safety.refusal(f.url) {
+            message = t("Taşınmadı: \(f.url.lastPathComponent) — \(why)", "Not moved: \(f.url.lastPathComponent) — \(why)")
+            return
+        }
         do {
             try FileManager.default.trashItem(at: f.url, resultingItemURL: nil)
-            ActivityStore.shared.record(f.size)
+            ActivityStore.shared.recordTrash(f.size)
             big.removeAll { $0.url == f.url }
             for i in dups.indices { dups[i].files.removeAll { $0.url == f.url } }
             dups.removeAll { $0.files.count < 2 }
